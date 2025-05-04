@@ -3,54 +3,54 @@ package com.rocket.chat.config;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rocket.chat.service.RocketChatService;
-import jakarta.annotation.PostConstruct;
 import org.java_websocket.client.WebSocketClient;
 import org.java_websocket.handshake.ServerHandshake;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Component;
 
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.UUID;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
-@Component
 public class RocketChatWebSocketClient extends WebSocketClient {
 
     private static final Logger log = LoggerFactory.getLogger(RocketChatWebSocketClient.class);
     private static final ObjectMapper objectMapper = new ObjectMapper();
+    private static final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
+    private static final int NORMAL_CLOSURE_CODE = 1000;
+    private static final int PING_INTERVAL = 30;
 
-    @Autowired
-    private RocketChatService rocketChatService;
+    private boolean shouldReconnect = true;
+    private int reconnectAttempts = 0;
+    private static final int MAX_RETRIES = 5;
 
-    @Value("${rocketchat.base-url}")
-    private String baseUrl;
+    private final RocketChatService rocketChatService;
+    private final String username;
+    private final String password;
+    private final String baseUrl;
 
-    @Value("${rocketchat.admin-username}")
-    private String username;
-
-    @Value("${rocketchat.admin-password}")
-    private String password;
-
-    private String roomId = "GENERAL";
+    private String roomId;
     private String sessionId;
     private String userId;
     private String authToken;
 
-    public RocketChatWebSocketClient(@Value("${rocketchat.websocket-url}") String wsUrl) throws Exception {
+    public RocketChatWebSocketClient(String wsUrl,
+                                     RocketChatService rocketChatService,
+                                     String username,
+                                     String password,
+                                     String baseUrl,
+                                     String roomId) throws Exception {
         super(new URI(wsUrl));
-    }
-
-    @PostConstruct
-    public void init() {
-        try {
-            this.connectBlocking();
-        } catch (Exception e) {
-            log.error("WebSocket connection failed", e);
-            throw new RuntimeException("Failed to establish WebSocket connection", e);
-        }
+        this.rocketChatService = rocketChatService;
+        this.username = username;
+        this.password = password;
+        this.baseUrl = baseUrl;
+        this.roomId = roomId;
+        // Schedule periodic ping
+        scheduler.scheduleAtFixedRate(this::sendPing, 0, PING_INTERVAL, TimeUnit.SECONDS);
     }
 
     @Override
@@ -64,28 +64,18 @@ public class RocketChatWebSocketClient extends WebSocketClient {
         try {
             JsonNode json = objectMapper.readTree(message);
 
-            // Handle "connected" event
             if ("connected".equals(json.path("msg").asText())) {
                 sessionId = json.path("session").asText();
                 log.info("WebSocket connected, session ID: {}", sessionId);
                 loginWithCredentials();
-            }
-            // Handle login response
-            else if ("result".equals(json.path("msg").asText()) && "login".equals(json.path("id").asText())) {
+            } else if ("result".equals(json.path("msg").asText()) && "login".equals(json.path("id").asText())) {
                 JsonNode result = json.path("result");
                 authToken = result.path("token").asText();
                 userId = result.path("id").asText();
-                log.info("Authenticated via WebSocket: token={}, userId={}", authToken, userId);
-                subscribeToAllRooms();
-            }
-            // Handle new user join event
-            else if ("changed".equals(json.path("msg").asText()) &&
-                    "stream-room-messages".equals(json.path("collection").asText()) &&
-                    json.toString().contains("user joined")) {
-                rocketChatService.sendMessage(roomId, "Welcome to the room!");
-            }
-            // Handle message events
-            else if ("changed".equals(json.path("msg").asText()) && "stream-room-messages".equals(json.path("collection").asText())) {
+                log.info("Authenticated: token={}, userId={}", authToken, userId);
+                subscribeToRoom();
+            } else if ("changed".equals(json.path("msg").asText()) &&
+                    "stream-room-messages".equals(json.path("collection").asText())) {
                 JsonNode fields = json.path("fields");
                 JsonNode args = fields.path("args");
                 if (args.isArray() && args.size() > 0) {
@@ -94,8 +84,8 @@ public class RocketChatWebSocketClient extends WebSocketClient {
                     String sender = messageData.path("u").path("username").asText();
                     String roomId = messageData.path("rid").asText();
                     log.info("Received message: '{}' from user: {}", msg, sender);
-                    // Trigger backend action
-                    rocketChatService.sendMessage(roomId, "Echo: " + msg);
+                    // Notifying listeners
+                    rocketChatService.processReceivedMessage(roomId, sender, msg);
                 }
             }
         } catch (Exception e) {
@@ -106,11 +96,10 @@ public class RocketChatWebSocketClient extends WebSocketClient {
     @Override
     public void onClose(int code, String reason, boolean remote) {
         log.warn("WebSocket closed: {}, Reason: {}", code, reason);
-        // Try to reconnect
-        try {
-            this.connectBlocking();
-        } catch (Exception e) {
-            log.error("Reconnection attempt failed", e);
+        if (shouldReconnect && code != NORMAL_CLOSURE_CODE) {
+            attemptReconnect();
+        } else {
+            log.info("WebSocket closed normally or reconnection disabled.");
         }
     }
 
@@ -124,47 +113,72 @@ public class RocketChatWebSocketClient extends WebSocketClient {
         String method = "login";
         String params = String.format("""
             {
-                "msg": "method",
-                "method": "%s",
-                "id": "%s",
-                "params": [{
-                    "user": {"username": "%s"},
-                    "password": {"digest": "%s", "algorithm": "sha-256"}
-                }]
+              "msg": "method",
+              "method": "%s",
+              "id": "%s",
+              "params": [{
+                "user": { "username": "%s" },
+                "password": { "digest": "%s", "algorithm": "sha-256" }
+              }]
             }
             """, method, id, username, sha256(password));
-
         send(params);
     }
 
-    private void subscribeToAllRooms() {
-        // Subscribe to all messages for a room (use real roomId here)
-        String roomId = "GENERAL";
+    private void subscribeToRoom() {
         String subId = UUID.randomUUID().toString();
-
         String subscribeJson = String.format("""
             {
-                "msg": "sub",
-                "id": "%s",
-                "name": "stream-room-messages",
-                "params": ["%s", false]
+              "msg": "sub",
+              "id": "%s",
+              "name": "stream-room-messages",
+              "params": ["%s", false]
             }
             """, subId, roomId);
-
         send(subscribeJson);
-        log.info("Subscribed to room messages: {}", roomId);
+        log.info("Subscribed to room: {}", roomId);
     }
 
     private String sha256(String base) {
         try {
-            java.security.MessageDigest digest = java.security.MessageDigest.getInstance("SHA-256");
+            var digest = java.security.MessageDigest.getInstance("SHA-256");
             byte[] hash = digest.digest(base.getBytes(StandardCharsets.UTF_8));
             StringBuilder hexString = new StringBuilder();
             for (byte b : hash) hexString.append(String.format("%02x", b));
             return hexString.toString();
         } catch (Exception ex) {
-            log.error("Error hashing password", ex);
-            throw new RuntimeException("Error hashing password", ex);
+            log.error("Hashing failed", ex);
+            throw new RuntimeException("SHA-256 hashing failed", ex);
+        }
+    }
+
+    private void attemptReconnect() {
+        if (reconnectAttempts >= MAX_RETRIES) {
+            log.error("Max reconnect attempts reached. Giving up.");
+            return;
+        }
+        int delay = (int) Math.pow(2, reconnectAttempts);
+        reconnectAttempts++;
+        scheduler.schedule(() -> {
+            try {
+                log.info("Attempting to reconnect to WebSocket (attempt {}/{})...", reconnectAttempts, MAX_RETRIES);
+                this.reconnectBlocking();
+                reconnectAttempts = 0;
+                log.info("Reconnected successfully.");
+                loginWithCredentials();
+            } catch (Exception e) {
+                log.error("Reconnection attempt failed", e);
+            }
+        }, delay, TimeUnit.SECONDS);
+    }
+
+    public void sendPing() {
+        if (this.isOpen()) {
+            send("{\"msg\":\"ping\"}");
+            log.info("Ping sent to WebSocket to keep connection alive.");
+        } else {
+            log.warn("WebSocket is closed. Attempting to reconnect...");
+            attemptReconnect();
         }
     }
 }

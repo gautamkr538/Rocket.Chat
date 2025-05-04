@@ -122,6 +122,10 @@ public class RocketChatService {
         }
     }
 
+    public void processReceivedMessage(String roomId, String sender, String message) {
+        log.info("Processing received message: '{}' from room '{}' and sender: {}", message, roomId, sender);
+    }
+
     private HttpHeaders authHeaders() {
         HttpHeaders headers = new HttpHeaders();
         headers.set("X-Auth-Token", authToken);
