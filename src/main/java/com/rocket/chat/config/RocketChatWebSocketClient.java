@@ -175,7 +175,7 @@ public class RocketChatWebSocketClient extends WebSocketClient {
     public void sendPing() {
         if (this.isOpen()) {
             send("{\"msg\":\"ping\"}");
-            log.info("Ping sent to WebSocket to keep connection alive.");
+//            log.info("Ping sent to WebSocket to keep connection alive.");
         } else {
             log.warn("WebSocket is closed. Attempting to reconnect...");
             attemptReconnect();
