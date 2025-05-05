@@ -16,7 +16,7 @@ import java.util.Map;
 @Service
 public class AdminService {
 
-    private static final Logger logger = LoggerFactory.getLogger(AdminService.class);
+    private static final Logger log = LoggerFactory.getLogger(AdminService.class);
 
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -52,9 +52,9 @@ public class AdminService {
             authToken = json.get("data").get("authToken").asText();
             userId = json.get("data").get("userId").asText();
 
-            logger.info("Admin login successful. Admin userId: {}", userId);
+            log.info("Admin login successful. Admin userId: {}", userId);
         } catch (Exception e) {
-            logger.error("Admin login failed", e);
+            log.error("Admin login failed", e);
             throw new RocketChatException("Failed to login as admin", e);
         }
     }
@@ -73,9 +73,9 @@ public class AdminService {
         HttpEntity<Map<String, Object>> request = new HttpEntity<>(body, headers);
         try {
             ResponseEntity<String> response = restTemplate.postForEntity(url, request, String.class);
-            logger.info("User created: {}", username);
+            log.info("User created: {}", username);
         } catch (Exception e) {
-            logger.error("Failed to create user: {}", username, e);
+            log.error("Failed to create user: {}", username, e);
             throw new RocketChatException("Failed to create user", e);
         }
     }

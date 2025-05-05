@@ -21,7 +21,7 @@ import java.util.concurrent.TimeUnit;
 @Service
 public class UserService {
 
-    private static final Logger logger = LoggerFactory.getLogger(UserService.class);
+    private static final Logger log = LoggerFactory.getLogger(UserService.class);
 
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -56,10 +56,10 @@ public class UserService {
 
         try {
             ResponseEntity<String> response = restTemplate.postForEntity(url, request, String.class);
-            logger.info("Message sent to room {}: {}", roomId, message);
+            log.info("Message sent to room {}: {}", roomId, message);
             return response.getBody();
         } catch (Exception e) {
-            logger.error("Error sending message to room {}", roomId, e);
+            log.error("Error sending message to room {}", roomId, e);
             throw new RocketChatException("Failed to send message", e);
         }
     }
@@ -70,10 +70,10 @@ public class UserService {
 
         try {
             ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.GET, request, String.class);
-            logger.info("Fetched messages for room {}", roomId);
+            log.info("Fetched messages for room {}", roomId);
             return response.getBody();
         } catch (Exception e) {
-            logger.error("Error fetching messages for room {}", roomId, e);
+            log.error("Error fetching messages for room {}", roomId, e);
             throw new RocketChatException("Failed to fetch messages", e);
         }
     }
@@ -84,10 +84,10 @@ public class UserService {
 
         try {
             ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.GET, request, String.class);
-            logger.info("Fetched direct messages list");
+            log.info("Fetched direct messages list");
             return response.getBody();
         } catch (Exception e) {
-            logger.error("Error fetching direct messages", e);
+            log.error("Error fetching direct messages", e);
             throw new RocketChatException("Failed to fetch direct messages", e);
         }
     }
@@ -105,16 +105,16 @@ public class UserService {
         try {
             ResponseEntity<String> response = restTemplate.postForEntity(url, request, String.class);
             JsonNode json = objectMapper.readTree(response.getBody());
-            logger.info("Created DM room with {}", username);
+            log.info("Created DM room with {}", username);
             return json.get("room").get("_id").asText();
         } catch (Exception e) {
-            logger.error("Error creating DM with {}", username, e);
+            log.error("Error creating DM with {}", username, e);
             throw new RocketChatException("Failed to create direct message", e);
         }
     }
 
     public void processReceivedMessage(String roomId, String sender, String message) {
-        logger.info("Received message from roomId={}, sender={}, message={}", roomId, sender, message);
+        log.info("Received message from roomId={}, sender={}, message={}", roomId, sender, message);
         // Update last activity time
         lastActivityMap.put(roomId, System.currentTimeMillis());
         // Auto-reply only once per session
@@ -123,9 +123,9 @@ public class UserService {
             try {
                 sendMessage(roomId, autoReply);
                 autoRepliedRooms.add(roomId);
-                logger.info("Sent auto-reply to room {}", roomId);
+                log.info("Sent auto-reply to room {}", roomId);
             } catch (RocketChatException e) {
-                logger.error("Failed to send auto-reply", e);
+                log.error("Failed to send auto-reply", e);
             }
         }
         // Schedule session close (resets timer on every message)
@@ -141,11 +141,11 @@ public class UserService {
                 try {
                     String closingMessage = "This session has been closed due to inactivity. Please start a new chat if needed.";
                     sendMessage(roomId, closingMessage);
-                    logger.info("Closed session for room {} due to inactivity", roomId);
+                    log.info("Closed session for room {} due to inactivity", roomId);
                     lastActivityMap.remove(roomId);
                     autoRepliedRooms.remove(roomId);
                 } catch (RocketChatException e) {
-                    logger.error("Failed to send session close message", e);
+                    log.error("Failed to send session close message", e);
                 }
             }
         }, INACTIVITY_TIMEOUT_MS, TimeUnit.MILLISECONDS);

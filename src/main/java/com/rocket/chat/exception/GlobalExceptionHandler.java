@@ -13,17 +13,17 @@ import java.util.Map;
 @ControllerAdvice
 public class GlobalExceptionHandler {
 
-    private static final Logger logger = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+    private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
     @ExceptionHandler(RocketChatException.class)
     public ResponseEntity<Object> handleRocketChatException(RocketChatException ex) {
-        logger.error("RocketChatException: {}", ex.getMessage(), ex);
+        log.error("RocketChatException: {}", ex.getMessage(), ex);
         return new ResponseEntity<>(buildErrorResponse(ex.getMessage(), HttpStatus.BAD_GATEWAY), HttpStatus.BAD_GATEWAY);
     }
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Object> handleGenericException(Exception ex) {
-        logger.error("Unhandled Exception: {}", ex.getMessage(), ex);
+        log.error("Unhandled Exception: {}", ex.getMessage(), ex);
         return new ResponseEntity<>(buildErrorResponse("An unexpected error occurred", HttpStatus.INTERNAL_SERVER_ERROR), HttpStatus.INTERNAL_SERVER_ERROR);
     }
 

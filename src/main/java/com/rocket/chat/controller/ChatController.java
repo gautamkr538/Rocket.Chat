@@ -14,7 +14,7 @@ import org.slf4j.LoggerFactory;
 @RequestMapping("/chat")
 public class ChatController {
 
-    private static final Logger logger = LoggerFactory.getLogger(ChatController.class);
+    private static final Logger log = LoggerFactory.getLogger(ChatController.class);
 
     private final AdminService adminService;
     private final UserService userService;
@@ -33,7 +33,7 @@ public class ChatController {
             userService.setAuth(adminService.getAdminAuthToken(), adminService.getAdminUserId());
             return ResponseEntity.ok("Admin logged in successfully");
         } catch (RocketChatException e) {
-            logger.error("Login failed", e);
+            log.error("Login failed", e);
             return ResponseEntity.status(500).body("Login failed: " + e.getMessage());
         }
     }
@@ -44,7 +44,7 @@ public class ChatController {
             adminService.createUser(username, email, password);
             return ResponseEntity.ok("User created successfully");
         } catch (RocketChatException e) {
-            logger.error("User creation failed", e);
+            log.error("User creation failed", e);
             return ResponseEntity.status(500).body("User creation failed: " + e.getMessage());
         }
     }
@@ -55,7 +55,7 @@ public class ChatController {
             String response = userService.sendMessage(request.getRoomId(), request.getMessage());
             return ResponseEntity.ok(response);
         } catch (RocketChatException e) {
-            logger.error("Failed to send message", e);
+            log.error("Failed to send message", e);
             return ResponseEntity.status(500).body("Failed to send message: " + e.getMessage());
         }
     }
@@ -66,7 +66,7 @@ public class ChatController {
             String response = userService.getMessagesInChannel(roomId);
             return ResponseEntity.ok(response);
         } catch (RocketChatException e) {
-            logger.error("Failed to retrieve messages", e);
+            log.error("Failed to retrieve messages", e);
             return ResponseEntity.status(500).body("Failed to retrieve messages: " + e.getMessage());
         }
     }
@@ -77,7 +77,7 @@ public class ChatController {
             String response = userService.listDirectMessages();
             return ResponseEntity.ok(response);
         } catch (RocketChatException e) {
-            logger.error("Failed to retrieve direct messages", e);
+            log.error("Failed to retrieve direct messages", e);
             return ResponseEntity.status(500).body("Failed to retrieve direct messages: " + e.getMessage());
         }
     }
@@ -88,7 +88,7 @@ public class ChatController {
             String roomId = userService.createDirectMessage(username);
             return ResponseEntity.ok("Direct message room created: " + roomId);
         } catch (RocketChatException e) {
-            logger.error("Failed to create direct message room", e);
+            log.error("Failed to create direct message room", e);
             return ResponseEntity.status(500).body("Failed to create direct message room: " + e.getMessage());
         }
     }
