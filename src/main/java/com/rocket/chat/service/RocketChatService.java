@@ -1,26 +1,26 @@
 package com.rocket.chat.service;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.rocket.chat.exception.RocketChatException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
+import java.util.HashMap;
+import java.util.Map;
+
 @Service
 public class RocketChatService {
 
+    private static final Logger logger = LoggerFactory.getLogger(RocketChatService.class);
+
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper = new ObjectMapper();
-    private static final Logger log = LoggerFactory.getLogger(RocketChatService.class);
-
-    @Autowired
-    public RocketChatService(RestTemplate restTemplate) {
-        this.restTemplate = restTemplate;
-    }
 
     @Value("${rocketchat.base-url}")
     private String baseUrl;
@@ -34,7 +34,11 @@ public class RocketChatService {
     private String authToken;
     private String userId;
 
-    public void login() throws Exception {
+    public RocketChatService(RestTemplate restTemplate) {
+        this.restTemplate = restTemplate;
+    }
+
+    public void login() throws RocketChatException {
         String loginUrl = baseUrl + "/login";
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
@@ -46,15 +50,14 @@ public class RocketChatService {
 
             authToken = json.get("data").get("authToken").asText();
             userId = json.get("data").get("userId").asText();
-            log.info("Successfully logged in to Rocket.Chat");
-            log.info("Your authToken: {} and userId: {}", authToken, userId);
+            logger.info("Successfully logged in to Rocket.Chat");
         } catch (Exception e) {
-            log.error("Error during login to Rocket.Chat", e);
-            throw new Exception("Login failed", e);
+            logger.error("Error during login to Rocket.Chat", e);
+            throw new RocketChatException("Login failed", e);
         }
     }
 
-    public String sendMessage(String roomId, String message) throws Exception {
+    public String sendMessage(String roomId, String message) throws RocketChatException {
         String url = baseUrl + "/chat.postMessage";
         HttpHeaders headers = authHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
@@ -62,68 +65,69 @@ public class RocketChatService {
         HttpEntity<String> request = new HttpEntity<>(json, headers);
         try {
             ResponseEntity<String> response = restTemplate.postForEntity(url, request, String.class);
-            log.info("Message sent to room {}: {}", roomId, message);
+            logger.info("Message sent to room {}: {}", roomId, message);
             return response.getBody();
         } catch (Exception e) {
-            log.error("Error sending message to room {}", roomId, e);
-            throw new Exception("Failed to send message", e);
+            logger.error("Error sending message to room {}", roomId, e);
+            throw new RocketChatException("Failed to send message", e);
         }
     }
 
-    public String getMessagesInChannel(String roomId) throws Exception {
+    public String getMessagesInChannel(String roomId) throws RocketChatException {
         String url = baseUrl + "/channels.messages?roomId=" + roomId;
         HttpEntity<Void> request = new HttpEntity<>(authHeaders());
         try {
             ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.GET, request, String.class);
-            log.info("Retrieved messages for room {}", roomId);
+            logger.info("Retrieved messages for room {}", roomId);
             return response.getBody();
         } catch (Exception e) {
-            log.error("Error retrieving messages for room {}", roomId, e);
-            throw new Exception("Failed to retrieve messages", e);
+            logger.error("Error retrieving messages for room {}", roomId, e);
+            throw new RocketChatException("Failed to retrieve messages", e);
         }
     }
 
-    public String listChannels() throws Exception {
+    public String listChannels() throws RocketChatException {
         String url = baseUrl + "/channels.list";
         HttpEntity<Void> request = new HttpEntity<>(authHeaders());
         try {
             ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.GET, request, String.class);
-            log.info("Retrieved channel list");
+            logger.info("Retrieved channel list");
             return response.getBody();
         } catch (Exception e) {
-            log.error("Error retrieving channels list", e);
-            throw new Exception("Failed to retrieve channels list", e);
+            logger.error("Error retrieving channels list", e);
+            throw new RocketChatException("Failed to retrieve channels list", e);
         }
     }
 
-    public String listDirectMessages() throws Exception {
+    public String listDirectMessages() throws RocketChatException {
         String url = baseUrl + "/im.list";
         HttpEntity<Void> request = new HttpEntity<>(authHeaders());
         try {
             ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.GET, request, String.class);
-            log.info("Retrieved direct message list");
+            logger.info("Retrieved direct message list");
             return response.getBody();
         } catch (Exception e) {
-            log.error("Error retrieving direct messages list", e);
-            throw new Exception("Failed to retrieve direct messages list", e);
+            logger.error("Error retrieving direct messages list", e);
+            throw new RocketChatException("Failed to retrieve direct messages list", e);
         }
     }
 
-    public String getMessageById(String messageId) throws Exception {
+    public String getMessageById(String messageId) throws RocketChatException {
         String url = baseUrl + "/chat.getMessage?msgId=" + messageId;
         HttpEntity<Void> request = new HttpEntity<>(authHeaders());
         try {
             ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.GET, request, String.class);
-            log.info("Retrieved message with ID {}", messageId);
+            logger.info("Retrieved message with ID {}", messageId);
             return response.getBody();
         } catch (Exception e) {
-            log.error("Error retrieving message with ID {}", messageId, e);
-            throw new Exception("Failed to retrieve message by ID", e);
+            logger.error("Error retrieving message with ID {}", messageId, e);
+            throw new RocketChatException("Failed to retrieve message by ID", e);
         }
     }
 
     public void processReceivedMessage(String roomId, String sender, String message) {
-        log.info("Processing received message: '{}' from room '{}' and sender: {}", message, roomId, sender);
+        logger.info("Processing received message: '{}' from room '{}' and sender: {}", message, roomId, sender);
+        // Implement auto-reply and inactivity handling here
     }
 
     private HttpHeaders authHeaders() {
@@ -131,5 +135,30 @@ public class RocketChatService {
         headers.set("X-Auth-Token", authToken);
         headers.set("X-User-Id", userId);
         return headers;
+    }
+
+    public void createUser(String username, String email, String password) {
+        String url = baseUrl + "/api/v1/users.create";
+        HttpHeaders headers = authHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        Map<String, Object> body = new HashMap<>();
+        body.put("username", username);
+        body.put("email", email);
+        body.put("name", username);
+        body.put("password", password);
+        HttpEntity<Map<String, Object>> request = new HttpEntity<>(body, headers);
+        restTemplate.postForEntity(url, request, String.class);
+    }
+
+    public String createDirectMessage(String username) throws JsonProcessingException {
+        String url = baseUrl + "/api/v1/im.create";
+        HttpHeaders headers = authHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        Map<String, Object> body = new HashMap<>();
+        body.put("username", username);
+        HttpEntity<Map<String, Object>> request = new HttpEntity<>(body, headers);
+        ResponseEntity<String> response = restTemplate.postForEntity(url, request, String.class);
+        JsonNode json = objectMapper.readTree(response.getBody());
+        return json.get("room").get("_id").asText();
     }
 }
