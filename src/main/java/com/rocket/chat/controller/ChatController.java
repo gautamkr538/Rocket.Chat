@@ -5,10 +5,13 @@ import com.rocket.chat.exception.RocketChatException;
 import com.rocket.chat.service.AdminService;
 import com.rocket.chat.service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.util.Map;
 
 @RestController
 @RequestMapping("/chat")
@@ -91,5 +94,17 @@ public class ChatController {
             log.error("Failed to create direct message room", e);
             return ResponseEntity.status(500).body("Failed to create direct message room: " + e.getMessage());
         }
+    }
+
+    @PostMapping("/simulate-message")
+    public ResponseEntity<String> handleIncomingMessage(@RequestBody Map<String, Object> payload,
+                                                        @RequestHeader(value = "X-RocketChat-Webhook-Token", required = false) String token) {
+        if (!"token".equals(token)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Invalid token");
+        }
+        String username = (String) payload.get("user_name");
+        String text = (String) payload.get("text");
+        log.info("Message from {}: {}", username, text);
+        return ResponseEntity.ok("Message received");
     }
 }

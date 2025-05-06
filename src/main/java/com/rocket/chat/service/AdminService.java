@@ -59,8 +59,8 @@ public class AdminService {
         }
     }
 
-    public void createUser(String username, String email, String password) throws RocketChatException {
-        String url = baseUrl + "/api/v1/users.create";
+    public void createUser(String username, String email, String password) {
+        String url = baseUrl + "/users.create";
         HttpHeaders headers = authHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
 

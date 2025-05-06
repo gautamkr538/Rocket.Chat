@@ -46,7 +46,7 @@ public class UserService {
         this.userId = userId;
     }
 
-    public String sendMessage(String roomId, String message) throws RocketChatException {
+    public String sendMessage(String roomId, String message) {
         String url = baseUrl + "/chat.postMessage";
         HttpHeaders headers = authHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
@@ -64,7 +64,7 @@ public class UserService {
         }
     }
 
-    public String getMessagesInChannel(String roomId) throws RocketChatException {
+    public String getMessagesInChannel(String roomId) {
         String url = baseUrl + "/channels.messages?roomId=" + roomId;
         HttpEntity<Void> request = new HttpEntity<>(authHeaders());
 
@@ -78,7 +78,7 @@ public class UserService {
         }
     }
 
-    public String listDirectMessages() throws RocketChatException {
+    public String listDirectMessages() {
         String url = baseUrl + "/im.list";
         HttpEntity<Void> request = new HttpEntity<>(authHeaders());
 
@@ -92,7 +92,7 @@ public class UserService {
         }
     }
 
-    public String createDirectMessage(String username) throws RocketChatException {
+    public String createDirectMessage(String username) {
         String url = baseUrl + "/api/v1/im.create";
         HttpHeaders headers = authHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
