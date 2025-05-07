@@ -59,7 +59,7 @@ public class AdminService {
         }
     }
 
-    public void createUser(String username, String email, String password) {
+    public void createUser(String username, String email, String name, String password) {
         String url = baseUrl + "/users.create";
         HttpHeaders headers = authHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
@@ -67,7 +67,7 @@ public class AdminService {
         Map<String, Object> body = new HashMap<>();
         body.put("username", username);
         body.put("email", email);
-        body.put("name", username);
+        body.put("name", name);
         body.put("password", password);
 
         HttpEntity<Map<String, Object>> request = new HttpEntity<>(body, headers);

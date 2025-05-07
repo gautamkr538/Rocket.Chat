@@ -42,9 +42,9 @@ public class ChatController {
     }
 
     @PostMapping("/create-user")
-    public ResponseEntity<String> createUser(@RequestParam String username, @RequestParam String email, @RequestParam String password) {
+    public ResponseEntity<String> createUser(@RequestParam String username, @RequestParam String email, @RequestParam String name, @RequestParam String password) {
         try {
-            adminService.createUser(username, email, password);
+            adminService.createUser(username, email, name, password);
             return ResponseEntity.ok("User created successfully");
         } catch (RocketChatException e) {
             log.error("User creation failed", e);
