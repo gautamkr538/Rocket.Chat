@@ -68,7 +68,11 @@ public class RocketChatWebSocketClient extends WebSocketClient {
                 }
                 case "result" -> handleResultMessage(json);
                 case "changed" -> handleChangedMessage(json);
-                default -> log.debug("Unhandled WebSocket message: {}", msgType);
+                case "ping" -> {
+                    send("{\"msg\":\"pong\"}");
+                    log.debug("Received ping, sent pong");
+                }
+                default -> log.debug("Unhandled WebSocket message: {}", message);
             }
         } catch (Exception e) {
             log.error("Error parsing WebSocket message", e);
@@ -77,12 +81,24 @@ public class RocketChatWebSocketClient extends WebSocketClient {
 
     private void handleResultMessage(JsonNode json) {
         String id = json.path("id").asText();
+        JsonNode result = json.path("result");
+
         if ("login".equals(id)) {
-            JsonNode result = json.path("result");
-            authToken = result.path("token").asText();
-            userId = result.path("id").asText();
+            if (result == null || result.isNull()) {
+                log.error("Login failed: {}", json.toPrettyString());
+                return;
+            }
+            authToken = result.path("token").asText(null);
+            userId = result.path("id").asText(null);
+            if (authToken == null || userId == null) {
+                log.error("Login response missing auth fields: {}", json.toPrettyString());
+                return;
+            }
             log.info("Login successful. User ID: {}, Token: {}", userId, authToken);
             subscribeToRoom();
+            subscribeToUserNotify();  // Subscribe to private notifications
+        } else {
+            log.debug("Received result for ID {}: {}", id, json.toPrettyString());
         }
     }
 
@@ -90,7 +106,7 @@ public class RocketChatWebSocketClient extends WebSocketClient {
         String collection = json.path("collection").asText();
         if ("stream-room-messages".equals(collection)) {
             JsonNode args = json.path("fields").path("args");
-            if (args.isArray() && args.size() > 0) {
+            if (args.isArray() && !args.isEmpty()) {
                 JsonNode messageData = args.get(0);
                 String message = messageData.path("msg").asText();
                 String sender = messageData.path("u").path("username").asText();
@@ -120,7 +136,7 @@ public class RocketChatWebSocketClient extends WebSocketClient {
             {
               "msg": "method",
               "method": "login",
-              "id": "login",
+              "id": "login-id",
               "params": [
                 {
                   "user": { "username": "%s" },
@@ -146,12 +162,28 @@ public class RocketChatWebSocketClient extends WebSocketClient {
         log.info("Subscribed to room: {}", roomId);
     }
 
+    private void subscribeToUserNotify() {
+        if (userId == null) return;
+
+        String subId = UUID.randomUUID().toString();
+        String payload = String.format("""
+        {
+          "msg": "sub",
+          "id": "%s",
+          "name": "stream-notify-user",
+          "params": [ "%s/message", false ]
+        }
+        """, subId, userId);
+        send(payload);
+        log.info("Subscribed to direct messages for user: {}", userId);
+    }
+
     private String buildConnectPayload() {
         return """
             {
               "msg": "connect",
               "version": "1",
-              "support": ["1", "pre2", "pre1"]
+              "support": ["1"]
             }
             """;
     }
