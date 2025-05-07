@@ -136,7 +136,7 @@ public class RocketChatWebSocketClient extends WebSocketClient {
             {
               "msg": "method",
               "method": "login",
-              "id": "login-id",
+              "id": "login",
               "params": [
                 {
                   "user": { "username": "%s" },
