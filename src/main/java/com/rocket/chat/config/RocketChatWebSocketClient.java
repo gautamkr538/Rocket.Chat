@@ -63,19 +63,19 @@ public class RocketChatWebSocketClient extends WebSocketClient {
             switch (msgType) {
                 case "connected" -> {
                     sessionId = json.path("session").asText();
-                    log.info("Connected to WebSocket, session ID: {}", sessionId);
+                    log.info("Connected to WebSocket | Session ID: {}", sessionId);
                     loginWithCredentials();
                 }
                 case "result" -> handleResultMessage(json);
                 case "changed" -> handleChangedMessage(json);
                 case "ping" -> {
                     send("{\"msg\":\"pong\"}");
-                    log.debug("Received ping, sent pong");
+                    log.debug("Ping received | Pong sent");
                 }
-                default -> log.debug("Unhandled WebSocket message: {}", message);
+                default -> log.debug("Unhandled WebSocket message type: {}", json.toPrettyString());
             }
         } catch (Exception e) {
-            log.error("Error parsing WebSocket message", e);
+            log.error("Error parsing WebSocket message:\n{}\nException: ", message, e);
         }
     }
 
@@ -85,35 +85,48 @@ public class RocketChatWebSocketClient extends WebSocketClient {
 
         if ("login".equals(id)) {
             if (result == null || result.isNull()) {
-                log.error("Login failed: {}", json.toPrettyString());
+                log.error("Login failed | Response: {}", json.toPrettyString());
                 return;
             }
             authToken = result.path("token").asText(null);
             userId = result.path("id").asText(null);
             if (authToken == null || userId == null) {
-                log.error("Login response missing auth fields: {}", json.toPrettyString());
+                log.error("Login successful but missing auth fields | Response: {}", json.toPrettyString());
                 return;
             }
-            log.info("Login successful. User ID: {}, Token: {}", userId, authToken);
+            log.info("Login successful | User ID: {}, Token: {}", userId, authToken);
             subscribeToRoom();
-            subscribeToUserNotify();  // Subscribe to private notifications
+            subscribeToUserNotify();
         } else {
-            log.debug("Received result for ID {}: {}", id, json.toPrettyString());
+            log.debug("Received result for ID {} | Payload: {}", id, json.toPrettyString());
         }
     }
 
     private void handleChangedMessage(JsonNode json) {
         String collection = json.path("collection").asText();
-        if ("stream-room-messages".equals(collection)) {
-            JsonNode args = json.path("fields").path("args");
-            if (args.isArray() && !args.isEmpty()) {
-                JsonNode messageData = args.get(0);
-                String message = messageData.path("msg").asText();
-                String sender = messageData.path("u").path("username").asText();
-                String roomId = messageData.path("rid").asText();
-                log.info("Received message: '{}' from user: {}", message, sender);
-                userService.processReceivedMessage(roomId, sender, message);
+
+        if (!"stream-room-messages".equals(collection)) {
+            log.debug("Ignored 'changed' message | Collection: {}", collection);
+            return;
+        }
+        JsonNode fields = json.path("fields");
+        JsonNode args = fields.path("args");
+
+        if (args.isArray() && !args.isEmpty()) {
+            JsonNode messageData = args.get(0);
+
+            String msg = messageData.path("msg").asText(null);
+            String roomId = messageData.path("rid").asText(null);
+            String sender = messageData.path("u").path("username").asText(null);
+
+            if (msg != null && roomId != null && sender != null) {
+                log.info("New message | Room: {} | From: {} | Message: {}", roomId, sender, msg);
+                userService.processReceivedMessage(roomId, sender, msg);
+            } else {
+                log.warn("Incomplete message data received | Data: {}", messageData.toPrettyString());
             }
+        } else {
+            log.debug("No 'args' found in 'changed' message | Payload: {}", json.toPrettyString());
         }
     }
 
@@ -183,7 +196,7 @@ public class RocketChatWebSocketClient extends WebSocketClient {
             {
               "msg": "connect",
               "version": "1",
-              "support": ["1"]
+              "support": ["1", "pre2", "pre1"]
             }
             """;
     }
