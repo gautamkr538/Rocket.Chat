@@ -19,6 +19,7 @@ public class AdminService {
     private static final Logger log = LoggerFactory.getLogger(AdminService.class);
 
     private final RestTemplate restTemplate;
+    private final UserService userService;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Value("${rocketchat.base-url}")
@@ -32,9 +33,11 @@ public class AdminService {
 
     private String authToken;
     private String userId;
+    private String publicRoomId;
 
-    public AdminService(RestTemplate restTemplate) {
+    public AdminService(RestTemplate restTemplate, UserService userService) {
         this.restTemplate = restTemplate;
+        this.userService = userService;
     }
 
     public void login() throws RocketChatException {
@@ -51,7 +54,8 @@ public class AdminService {
 
             authToken = json.get("data").get("authToken").asText();
             userId = json.get("data").get("userId").asText();
-
+            // Create or get the public room
+            String roomId = userService.createOrGetUserPublicRoom("john_doe");
             log.info("Admin login successful. Admin userId: {}", userId);
         } catch (Exception e) {
             log.error("Admin login failed", e);

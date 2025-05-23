@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -64,9 +65,9 @@ public class ChatController {
     }
 
     @GetMapping("/messages")
-    public ResponseEntity<String> getMessagesInChannel(@RequestParam String roomId) {
+    public ResponseEntity<?> getMessagesInChannel(@RequestParam String roomId) {
         try {
-            String response = userService.getMessagesInChannel(roomId);
+            List<String> response = userService.getMessagesInRoom(roomId);
             return ResponseEntity.ok(response);
         } catch (RocketChatException e) {
             log.error("Failed to retrieve messages", e);
@@ -74,10 +75,10 @@ public class ChatController {
         }
     }
 
-    @GetMapping("/direct-messages")
-    public ResponseEntity<String> listDirectMessages() {
+    @GetMapping("/get-direct-messages")
+    public ResponseEntity<String> getDirectRoomMessages() {
         try {
-            String response = userService.listDirectMessages();
+            String response = userService.getDirectRoomMessages();
             return ResponseEntity.ok(response);
         } catch (RocketChatException e) {
             log.error("Failed to retrieve direct messages", e);
@@ -85,10 +86,10 @@ public class ChatController {
         }
     }
 
-    @PostMapping("/direct-message")
-    public ResponseEntity<String> createDirectMessage(@RequestParam String username) {
+    @PostMapping("/create-direct-message-room")
+    public ResponseEntity<String> createDirectMessageRoom(@RequestParam String username) {
         try {
-            String roomId = userService.createDirectMessage(username);
+            String roomId = userService.createDirectMessageRoom(username);
             return ResponseEntity.ok("Direct message room created: " + roomId);
         } catch (RocketChatException e) {
             log.error("Failed to create direct message room", e);

@@ -10,9 +10,7 @@ import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -64,21 +62,32 @@ public class UserService {
         }
     }
 
-    public String getMessagesInChannel(String roomId) {
+    public List<String> getMessagesInRoom(String roomId) {
         String url = baseUrl + "/channels.messages?roomId=" + roomId;
         HttpEntity<Void> request = new HttpEntity<>(authHeaders());
 
         try {
             ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.GET, request, String.class);
-            log.info("Fetched messages for room {}", roomId);
-            return response.getBody();
+            JsonNode json = objectMapper.readTree(response.getBody());
+
+            List<String> messages = new ArrayList<>();
+            JsonNode messagesNode = json.get("messages");
+
+            if (messagesNode != null && messagesNode.isArray()) {
+                for (JsonNode messageNode : messagesNode) {
+                    String text = messageNode.get("msg").asText();
+                    messages.add(text);
+                }
+            }
+            log.info("Fetched {} messages from room {}", messages.size(), roomId);
+            return messages;
         } catch (Exception e) {
-            log.error("Error fetching messages for room {}", roomId, e);
-            throw new RocketChatException("Failed to fetch messages", e);
+            log.error("Failed to fetch messages for room {}: {}", roomId, e.getMessage());
+            throw new RocketChatException("Unable to fetch messages", e);
         }
     }
 
-    public String listDirectMessages() {
+    public String getDirectRoomMessages() {
         String url = baseUrl + "/im.list";
         HttpEntity<Void> request = new HttpEntity<>(authHeaders());
 
@@ -92,7 +101,7 @@ public class UserService {
         }
     }
 
-    public String createDirectMessage(String username) {
+    public String createDirectMessageRoom(String username) {
         String url = baseUrl + "/api/v1/im.create";
         HttpHeaders headers = authHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
@@ -130,6 +139,77 @@ public class UserService {
         }
         // Schedule session close (resets timer on every message)
         scheduleSessionClose(roomId);
+    }
+
+    public String createOrGetUserPublicRoom(String username) {
+        String roomName = "support-" + username;
+        // Get the room if it already exists
+        try {
+            String existingRoomId = getPublicRoomIdByName(roomName);
+            log.info("Public room already exists for user {}: {}", username, existingRoomId);
+            return existingRoomId;
+        } catch (Exception e) {
+            log.info("No existing room found for user {}, creating new one...", username);
+        }
+        // Create a new room and add the user
+        return createPublicRoomAndJoinUser(roomName, username);
+    }
+
+    public String createPublicRoomAndJoinUser(String roomName, String username) {
+        String createUrl = baseUrl + "/channels.create";
+        HttpHeaders headers = authHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+
+        Map<String, Object> body = new HashMap<>();
+        body.put("name", roomName);
+        body.put("readOnly", false); // Writable
+
+        HttpEntity<Map<String, Object>> request = new HttpEntity<>(body, headers);
+
+        try {
+            ResponseEntity<String> response = restTemplate.postForEntity(createUrl, request, String.class);
+            JsonNode json = objectMapper.readTree(response.getBody());
+            String roomId = json.get("channel").get("_id").asText();
+            log.info("Created public room: {}", roomName);
+
+            joinUserToRoom(username, roomId);
+            return roomId;
+        } catch (Exception e) {
+            log.error("Failed to create room: {}", e.getMessage());
+            throw new RocketChatException("Failed to create public room", e);
+        }
+    }
+
+    public String getPublicRoomIdByName(String roomName) {
+        String url = baseUrl + "/channels.info?roomName=" + roomName;
+        HttpEntity<Void> request = new HttpEntity<>(authHeaders());
+
+        try {
+            ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.GET, request, String.class);
+            JsonNode json = objectMapper.readTree(response.getBody());
+            return json.get("channel").get("_id").asText();
+        } catch (Exception e) {
+            log.error("Error fetching public room ID for {}", roomName, e);
+            throw new RocketChatException("Failed to get public room ID", e);
+        }
+    }
+
+    public void joinUserToRoom(String username, String roomId) {
+        String url = baseUrl + "/channels.invite";
+        HttpHeaders headers = authHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+
+        Map<String, Object> body = new HashMap<>();
+        body.put("roomId", roomId);
+        body.put("username", username);
+
+        HttpEntity<Map<String, Object>> request = new HttpEntity<>(body, headers);
+        try {
+            restTemplate.postForEntity(url, request, String.class);
+            log.info("Added user {} to room {}", username, roomId);
+        } catch (Exception e) {
+            log.warn("User {} might already be in room {}: {}", username, roomId, e.getMessage());
+        }
     }
 
     private void scheduleSessionClose(String roomId) {
