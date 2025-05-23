@@ -55,7 +55,7 @@ public class AdminService {
             authToken = json.get("data").get("authToken").asText();
             userId = json.get("data").get("userId").asText();
             // Create or get the public room
-            roomId = userService.createOrGetUserPublicRoom("john_doe");
+            roomId = userService.createOrGetUserPublicRoom(adminUsername);
             log.info("Admin login successful. Admin userId: {}", userId);
             log.info("Public room ID initialized: {}", roomId);
         } catch (Exception e) {

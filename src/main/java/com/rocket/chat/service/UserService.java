@@ -2,6 +2,7 @@ package com.rocket.chat.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.rocket.chat.dto.UserSession;
 import com.rocket.chat.exception.RocketChatException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -42,6 +43,28 @@ public class UserService {
     public void setAuth(String token, String userId) {
         this.authToken = token;
         this.userId = userId;
+    }
+
+    public UserSession loginUser(String username, String password) {
+        String url = baseUrl + "/login";
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+
+        Map<String, String> body = new HashMap<>();
+        body.put("user", username);
+        body.put("password", password);
+        HttpEntity<Map<String, String>> request = new HttpEntity<>(body, headers);
+        try {
+            ResponseEntity<String> response = restTemplate.postForEntity(url, request, String.class);
+            JsonNode json = objectMapper.readTree(response.getBody());
+
+            String userId = json.get("data").get("userId").asText();
+            String authToken = json.get("data").get("authToken").asText();
+            return new UserSession(userId, authToken);
+        } catch (Exception e) {
+            log.error("Login failed for user: {}", username, e);
+            throw new RocketChatException("User login failed", e);
+        }
     }
 
     public String sendMessage(String roomId, String message) {
@@ -232,6 +255,9 @@ public class UserService {
     }
 
     private HttpHeaders authHeaders() {
+        if (authToken == null || userId == null) {
+            throw new IllegalStateException("Auth headers not set. Call setAuth() first.");
+        }
         HttpHeaders headers = new HttpHeaders();
         headers.set("X-Auth-Token", authToken);
         headers.set("X-User-Id", userId);

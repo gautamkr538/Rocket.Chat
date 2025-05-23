@@ -1,6 +1,7 @@
 package com.rocket.chat.controller;
 
 import com.rocket.chat.dto.MessageRequest;
+import com.rocket.chat.dto.UserSession;
 import com.rocket.chat.exception.RocketChatException;
 import com.rocket.chat.service.AdminService;
 import com.rocket.chat.service.UserService;
@@ -39,6 +40,18 @@ public class ChatController {
         } catch (RocketChatException e) {
             log.error("Login failed", e);
             return ResponseEntity.status(500).body("Login failed: " + e.getMessage());
+        }
+    }
+
+    @PostMapping("/user-login")
+    public ResponseEntity<UserSession> loginUser(@RequestParam String username, @RequestParam String password) {
+        try {
+            UserSession session = userService.loginUser(username, password);
+            log.info("Logged in user: {}", session);
+            return ResponseEntity.ok(session);
+        } catch (RocketChatException e) {
+            log.error("User login failed", e);
+            return ResponseEntity.status(401).body(null);
         }
     }
 
