@@ -49,7 +49,7 @@ Configuration	Application properties, Rocket.Chat integration configs
 
 ⚡ How to Run
 1️⃣ Clone the repository
-git clone https://github.com/your-username/rocket-chat-integration.git
+git clone https://github.com/gautamkr538/Rocket.Chat.git
 cd rocket-chat-integration
 
 2️⃣ Configure Environment
