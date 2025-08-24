@@ -1,6 +1,6 @@
 # 🚀 Rocket.Chat Spring Boot Integration
 
-This repository contains a **Spring Boot-based integration** with a **self-hosted Rocket.Chat instance** using **REST APIs and WebSockets**, with **PostgreSQL for data storage** inside the Rocket.Chat container.
+This repository contains a **Spring Boot + RBAC** based integration with a **self-hosted Rocket.Chat instance** using **REST APIs and WebSockets**, with **PostgreSQL for data storage** inside the Rocket.Chat container.
 
 ---
 
