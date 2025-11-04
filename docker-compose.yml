@@ -26,8 +26,8 @@ services:
     environment:
       - MONGO_URL=mongodb://mongo:27017/rocketchat?replicaSet=rs0
       - MONGO_OPLOG_URL=mongodb://mongo:27017/local?replicaSet=rs0
-      - ROOT_URL=http://34.133.204.140
-      #  - CDN_PREFIX=https://chat-dev-clientportal.kickcharge.com
+      - ROOT_URL=http://
+      #  - CDN_PREFIX=
       - PORT=3000
       - DEPLOY_METHOD=docker
       # - EXIT_UNHANDLEDPROMISEREJECTION=true
